@@ -17,12 +17,16 @@ jobs:
         include:
           - platform: windows-latest
             args: ''
+            rename_script: rename-windows.sh
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
+            rename_script: rename-macos.sh
           - platform: macos-latest
             args: '--target x86_64-apple-darwin'
+            rename_script: rename-macos.sh
           - platform: ubuntu-22.04
             args: ''
+            rename_script: rename-linux.sh
 
     runs-on: ${{ matrix.platform }}
 
@@ -57,31 +61,97 @@ jobs:
         run: npm ci
         working-directory: app-frontend
 
-      - name: build and release
+      - name: build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: '橙记 v__VERSION__'
-          releaseBody: |
-            ## 橙记 v__VERSION__
-
-            **一目了然，橙就高效。** 一款轻量高效的桌面便签应用。
-
-            ### 下载安装包
-
-            | 平台 | 文件 |
-            |------|------|
-            | Windows (x64) | `*_x64-setup.exe` |
-            | macOS (Apple Silicon) | `*_aarch64.dmg` |
-            | macOS (Intel) | `*_x64.dmg` |
-            | Linux (x64) | `*_amd64.AppImage` |
-
-            > 应用内已支持自动更新，也可手动下载对应平台的安装包覆盖安装。
-          releaseDraft: false
-          prerelease: false
           projectPath: app-frontend
           args: ${{ matrix.args }}
+
+      - name: rename installers
+        run: bash app-frontend/scripts/${{ matrix.rename_script }}
+
+      - name: upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            app-frontend/src-tauri/target/release/bundle/**/*.exe
+            app-frontend/src-tauri/target/release/bundle/**/*.dmg
+            app-frontend/src-tauri/target/release/bundle/**/*.AppImage
+            app-frontend/src-tauri/target/release/bundle/**/*.sig
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  updater-manifest:
+    needs: publish
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p assets
+          cd assets
+          # Download all release assets
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --pattern "*.exe" --pattern "*.dmg" --pattern "*.AppImage" --pattern "*.sig" || true
+
+      - name: generate latest.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO_URL="https://github.com/MarkHoo/OrangeNote/releases/download/${GITHUB_REF_NAME}"
+
+          build_platform_json() {
+            local binary_name="$1"
+            local platform_key="$2"
+            local sig_file="assets/${binary_name}.sig"
+
+            if [ -f "assets/${binary_name}" ] && [ -f "$sig_file" ]; then
+              local sig_content
+              sig_content=$(cat "$sig_file" | tr -d '\n\r')
+              echo "\"${platform_key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary_name}\"}"
+            fi
+          }
+
+          # Find actual filenames
+          WIN_EXE=$(ls assets/*.exe 2>/dev/null | head -1 | xargs -r basename)
+          MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          LINUX_APP=$(ls assets/*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+
+          PLATFORMS=""
+          for entry in \
+            "$(build_platform_json "$WIN_EXE" "windows-x86_64")" \
+            "$(build_platform_json "$MAC_ARM" "darwin-aarch64")" \
+            "$(build_platform_json "$MAC_X64" "darwin-x86_64")" \
+            "$(build_platform_json "$LINUX_APP" "linux-x86_64")"; do
+            if [ -n "$entry" ]; then
+              [ -n "$PLATFORMS" ] && PLATFORMS="${PLATFORMS},"
+              PLATFORMS="${PLATFORMS}${entry}"
+            fi
+          done
+
+          cat > latest.json << EOJSON
+          {
+            "version": "${VERSION}",
+            "notes": "橙记 ${GITHUB_REF_NAME} - 一目了然，橙就高效",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {${PLATFORMS}}
+          }
+          EOJSON
+
+          echo "=== latest.json ==="
+          cat latest.json
+
+      - name: upload latest.json
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
