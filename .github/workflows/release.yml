@@ -66,7 +66,21 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: '橙记 v__VERSION__'
-          releaseBody: '下载对应平台的安装包即可安装更新。'
+          releaseBody: |
+            ## 橙记 v__VERSION__
+
+            **一目了然，橙就高效。** 一款轻量高效的桌面便签应用。
+
+            ### 下载安装包
+
+            | 平台 | 文件 |
+            |------|------|
+            | Windows (x64) | `*_x64-setup.exe` |
+            | macOS (Apple Silicon) | `*_aarch64.dmg` |
+            | macOS (Intel) | `*_x64.dmg` |
+            | Linux (x64) | `*_amd64.AppImage` |
+
+            > 应用内已支持自动更新，也可手动下载对应平台的安装包覆盖安装。
           releaseDraft: false
           prerelease: false
           projectPath: app-frontend

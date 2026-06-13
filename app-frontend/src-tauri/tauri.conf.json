@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/tooling/cli/schema.json",
-  "productName": "橙记",
+  "productName": "OrangeNote",
   "version": "1.0.0",
   "identifier": "com.orange-note.app",
   "build": {
