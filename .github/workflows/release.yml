@@ -137,8 +137,14 @@ jobs:
         run: |
           mkdir -p assets
           cd assets
-          # Download all release assets
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --pattern "*.exe" --pattern "*.msi" --pattern "*.dmg" --pattern "*.AppImage" --pattern "*.sig" || true
+          # Download release assets (exclude latest.json)
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+            --pattern "*.exe" --pattern "*.msi" --pattern "*.dmg" \
+            --pattern "*.AppImage" --pattern "*.sig" || true
+          # Remove latest.json if accidentally downloaded
+          rm -f latest.json
+          echo "=== Downloaded files ==="
+          ls -la
 
       - name: generate latest.json
         run: |
@@ -157,11 +163,28 @@ jobs:
             fi
           }
 
-          # Find actual filenames
-          WIN_EXE=$(ls assets/*.exe 2>/dev/null | head -1 | xargs -r basename)
-          MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
-          MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
-          LINUX_APP=$(ls assets/*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          # Find actual filenames - prefer new naming (OrangeNote-v*), fallback to old (_*)
+          # Windows NSIS
+          WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/_[0-9]*.exe 2>/dev/null | head -1 | xargs -r basename)
+
+          # macOS ARM64
+          MAC_ARM=$(ls assets/OrangeNote-v*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+
+          # macOS x64
+          MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/_[0-9]*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+
+          # Linux AppImage
+          LINUX_APP=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$LINUX_APP" ] && LINUX_APP=$(ls assets/_[0-9]*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+
+          echo "Found files:"
+          echo "  WIN_EXE=$WIN_EXE"
+          echo "  MAC_ARM=$MAC_ARM"
+          echo "  MAC_X64=$MAC_X64"
+          echo "  LINUX_APP=$LINUX_APP"
 
           PLATFORMS=""
           for entry in \
