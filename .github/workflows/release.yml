@@ -86,12 +86,13 @@ jobs:
 
             ### 📦 下载安装
 
-            | 平台 | 架构 | 文件 |
-            |------|------|------|
-            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-x64-setup.exe` |
-            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-${{ github.ref_name }}-aarch64.dmg` |
-            | macOS | Intel | `OrangeNote-${{ github.ref_name }}-x64.dmg` |
-            | Linux | x64 | `OrangeNote-${{ github.ref_name }}-amd64.AppImage` |
+            | 平台 | 架构 | 安装包 |
+            |------|------|--------|
+            | Windows | x64 | `OrangeNote-v1.0.0-x64-setup.exe` (NSIS) |
+            | Windows | x64 | `OrangeNote-v1.0.0-x64.msi` (MSI) |
+            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-v1.0.0-aarch64.dmg` |
+            | macOS | Intel | `OrangeNote-v1.0.0-x64.dmg` |
+            | Linux | x64 | `OrangeNote-v1.0.0-amd64.AppImage` |
 
             ### 🔄 自动更新
 
@@ -104,6 +105,7 @@ jobs:
             - **支持平台：** Windows 10+、macOS 12+、Ubuntu 22.04+
           files: |
             app-frontend/src-tauri/target/release/bundle/**/*.exe
+            app-frontend/src-tauri/target/release/bundle/**/*.msi
             app-frontend/src-tauri/target/release/bundle/**/*.dmg
             app-frontend/src-tauri/target/release/bundle/**/*.AppImage
             app-frontend/src-tauri/target/release/bundle/**/*.sig
@@ -123,7 +125,7 @@ jobs:
           mkdir -p assets
           cd assets
           # Download all release assets
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --pattern "*.exe" --pattern "*.dmg" --pattern "*.AppImage" --pattern "*.sig" || true
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --pattern "*.exe" --pattern "*.msi" --pattern "*.dmg" --pattern "*.AppImage" --pattern "*.sig" || true
 
       - name: generate latest.json
         run: |
