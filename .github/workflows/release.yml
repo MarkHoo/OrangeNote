@@ -74,6 +74,19 @@ jobs:
       - name: rename installers
         run: bash app-frontend/scripts/${{ matrix.rename_script }}
 
+      - name: clean old release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete old assets with wrong names (starting with _ or without version prefix)
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null | while read -r name; do
+            if [[ "$name" == _* ]] || [[ "$name" == latest.json ]]; then
+              echo "Deleting old asset: $name"
+              gh release delete-asset "${{ github.ref_name }}" "$name" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+            fi
+          done
+        shell: bash
+
       - name: upload to release
         uses: softprops/action-gh-release@v2
         with:

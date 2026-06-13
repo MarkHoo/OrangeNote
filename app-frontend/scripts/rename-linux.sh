@@ -1,23 +1,17 @@
 #!/bin/bash
 # Rename Linux AppImage and signature
 # OrangeNote_1.0.0_amd64.AppImage -> OrangeNote-v1.0.0-amd64.AppImage
-BUNDLE_DIR="app-frontend/src-tauri/target/release/bundle/appimage"
+BUNDLE_DIR="app-frontend/src-tauri/target/release/bundle"
 
 if [ -d "$BUNDLE_DIR" ]; then
-  for file in "$BUNDLE_DIR"/*.AppImage; do
+  find "$BUNDLE_DIR" \( -name "*.AppImage" -o -name "*.AppImage.sig" \) | while read -r file; do
     [ -f "$file" ] || continue
-    newname=$(echo "$file" | sed 's/_\([0-9]\)/-v\1/g' | sed 's/_/-/g')
-    if [ "$file" != "$newname" ]; then
-      mv "$file" "$newname"
-      echo "Renamed: $(basename "$file") -> $(basename "$newname")"
-    fi
-  done
-  for file in "$BUNDLE_DIR"/*.AppImage.sig; do
-    [ -f "$file" ] || continue
-    newname=$(echo "$file" | sed 's/_\([0-9]\)/-v\1/g' | sed 's/_/-/g')
-    if [ "$file" != "$newname" ]; then
-      mv "$file" "$newname"
-      echo "Renamed: $(basename "$file") -> $(basename "$newname")"
+    dir=$(dirname "$file")
+    base=$(basename "$file")
+    newbase=$(echo "$base" | sed 's/_\([0-9]\)/-v\1/g' | sed 's/_/-/g')
+    if [ "$base" != "$newbase" ]; then
+      mv "$file" "$dir/$newbase"
+      echo "Renamed: $base -> $newbase"
     fi
   done
 fi
