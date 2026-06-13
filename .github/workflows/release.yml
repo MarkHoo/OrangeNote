@@ -78,6 +78,30 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          name: '橙记 ${{ github.ref_name }}'
+          body: |
+            ## 橙记 ${{ github.ref_name }}
+
+            **一目了然，橙就高效。** 橙记是一款轻量高效的桌面便签应用，基于 Tauri 2 构建，数据本地存储，支持多语言、标签管理、定时提醒等功能。
+
+            ### 📦 下载安装
+
+            | 平台 | 架构 | 文件 |
+            |------|------|------|
+            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-x64-setup.exe` |
+            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-${{ github.ref_name }}-aarch64.dmg` |
+            | macOS | Intel | `OrangeNote-${{ github.ref_name }}-x64.dmg` |
+            | Linux | x64 | `OrangeNote-${{ github.ref_name }}-amd64.AppImage` |
+
+            ### 🔄 自动更新
+
+            应用内置自动更新功能，启动时会自动检测新版本并静默下载。也可在 **设置 → 检查更新** 手动触发。
+
+            ### 🛠 技术栈
+
+            - **前端：** React 19 + TypeScript + Vite + Tailwind CSS 4
+            - **后端：** Rust + Tauri 2 + SQLite
+            - **支持平台：** Windows 10+、macOS 12+、Ubuntu 22.04+
           files: |
             app-frontend/src-tauri/target/release/bundle/**/*.exe
             app-frontend/src-tauri/target/release/bundle/**/*.dmg
@@ -139,7 +163,7 @@ jobs:
           cat > latest.json << EOJSON
           {
             "version": "${VERSION}",
-            "notes": "橙记 ${GITHUB_REF_NAME} - 一目了然，橙就高效",
+            "notes": "橙记 ${GITHUB_REF_NAME} — 一目了然，橙就高效。修复已知问题，优化用户体验。",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {${PLATFORMS}}
           }
