@@ -129,11 +129,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p assets && cd assets
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --clobber
-          rm -f latest.json
-          echo "=== Downloaded files ==="
-          ls -la
+          mkdir -p assets
+          # Download all release assets using gh CLI
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir assets --clobber
+          # Remove latest.json if downloaded
+          rm -f assets/latest.json
+          echo "=== Downloaded files in assets/ ==="
+          ls -la assets/
+          echo ""
+          echo "=== File count ==="
+          ls assets/ | wc -l
 
       - name: generate latest.json
         run: |
