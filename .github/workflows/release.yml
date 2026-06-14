@@ -75,6 +75,15 @@ jobs:
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
 
+      - name: find all bundle files
+        shell: bash
+        run: |
+          echo "=== All files in target/ matching bundle patterns ==="
+          find src-tauri/target \( -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
+          echo ""
+          echo "=== All .sig files anywhere in target/ ==="
+          find src-tauri/target -name "*.sig" 2>/dev/null | sort
+
       - name: upload to release
         uses: softprops/action-gh-release@v2
         with:
