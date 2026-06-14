@@ -125,82 +125,124 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: download release assets
+      - name: generate and upload latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          VERSION="${TAG#v}"
+          API_URL="https://api.github.com/repos/${REPO}/releases/tags/${TAG}"
+          REPO_URL="https://github.com/${REPO}/releases/download/${TAG}"
+
+          echo "=== Fetching release info ==="
+          RELEASE_JSON=$(curl -sH "Authorization: token ${GITHUB_TOKEN}" "$API_URL")
+          echo "Release: $(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name','?'))" 2>/dev/null)"
+
           mkdir -p assets
-          # Download all release assets using gh CLI
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --dir assets --clobber
-          # Remove latest.json if downloaded
-          rm -f assets/latest.json
-          echo "=== Downloaded files in assets/ ==="
-          ls -la assets/
-          echo ""
-          echo "=== File count ==="
-          ls assets/ | wc -l
 
-      - name: generate latest.json
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          REPO_URL="https://github.com/MarkHoo/OrangeNote/releases/download/${GITHUB_REF_NAME}"
-
-          build_platform_json() {
-            local binary_name="$1"
-            local platform_key="$2"
-            local sig_file="assets/${binary_name}.sig"
-
-            if [ -f "assets/${binary_name}" ] && [ -f "$sig_file" ]; then
-              local sig_content
-              sig_content=$(cat "$sig_file" | tr -d '\n\r')
-              echo "\"${platform_key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary_name}\"}"
+          # Download each binary and its .sig file
+          download_asset() {
+            local name="$1"
+            local url="$2"
+            echo "Downloading: $name"
+            curl -sL -o "assets/${name}" "$url"
+            if [ -f "assets/${name}" ]; then
+              echo "  OK: $(wc -c < assets/${name}) bytes"
             else
-              echo "WARNING: Missing file for ${platform_key}" >&2
-              [ ! -f "assets/${binary_name}" ] && echo "  -> binary not found: assets/${binary_name}" >&2
-              [ ! -f "$sig_file" ] && echo "  -> signature not found: ${sig_file}" >&2
+              echo "  FAILED"
             fi
           }
 
-          echo "=== Searching for platform files ==="
+          # Get asset URLs from release JSON and download binaries + sigs
+          echo "$RELEASE_JSON" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for asset in data.get('assets', []):
+              name = asset['name']
+              url = asset['browser_download_url']
+              if name.endswith('.exe') or name.endswith('.msi') or name.endswith('.dmg') or name.endswith('.AppImage') or name.endswith('.sig'):
+                  print(f'{name}\t{url}')
+          " | while IFS=$'\t' read -r name url; do
+            download_asset "$name" "$url"
+          done
 
-          # Windows NSIS (.exe)
-          WIN_EXE=$(ls assets/OrangeNote-v*Windows*.exe 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/*.exe 2>/dev/null | head -1 | xargs -r basename)
+          echo ""
+          echo "=== Downloaded files ==="
+          ls -la assets/
+
+          # Find platform files
+          find_binary() {
+            local pattern="$1"
+            local exclude="${2:-}"
+            local result
+            if [ -n "$exclude" ]; then
+              result=$(ls assets/$pattern 2>/dev/null | grep -v "$exclude" | head -1)
+            else
+              result=$(ls assets/$pattern 2>/dev/null | head -1)
+            fi
+            if [ -n "$result" ]; then
+              basename "$result"
+            fi
+          }
+
+          echo ""
+          echo "=== Finding platform files ==="
+
+          WIN_EXE=$(find_binary "*Windows*.exe")
+          [ -z "$WIN_EXE" ] && WIN_EXE=$(find_binary "*.exe")
           echo "WIN_EXE=$WIN_EXE"
 
-          # macOS ARM64 (.dmg with aarch64)
-          MAC_ARM=$(ls assets/OrangeNote-v*macOS*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          MAC_ARM=$(find_binary "*macOS*aarch64*.dmg")
+          [ -z "$MAC_ARM" ] && MAC_ARM=$(find_binary "*aarch64*.dmg")
           echo "MAC_ARM=$MAC_ARM"
 
-          # macOS x64 (.dmg with x64, not aarch64)
-          MAC_X64=$(ls assets/OrangeNote-v*macOS*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
-          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          MAC_X64=$(find_binary "*macOS*x64*.dmg" "aarch64")
+          [ -z "$MAC_X64" ] && MAC_X64=$(find_binary "*x64*.dmg" "aarch64")
           echo "MAC_X64=$MAC_X64"
 
-          # Linux x86_64 (.AppImage with amd64)
-          LINUX_X64=$(ls assets/OrangeNote-v*Linux*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          LINUX_X64=$(find_binary "*Linux*amd64*.AppImage")
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(find_binary "*amd64*.AppImage")
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(find_binary "*.AppImage" "aarch64")
           echo "LINUX_X64=$LINUX_X64"
 
-          # Linux ARM64 (.AppImage with aarch64)
-          LINUX_ARM=$(ls assets/OrangeNote-v*Linux*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          LINUX_ARM=$(find_binary "*Linux*aarch64*.AppImage")
+          [ -z "$LINUX_ARM" ] && LINUX_ARM=$(find_binary "*aarch64*.AppImage")
           echo "LINUX_ARM=$LINUX_ARM"
+
+          # Build platform JSON entries
+          build_entry() {
+            local binary="$1"
+            local key="$2"
+            if [ -z "$binary" ]; then
+              echo "SKIP: $key (no binary found)" >&2
+              return
+            fi
+            local sig="assets/${binary}.sig"
+            if [ ! -f "assets/${binary}" ]; then
+              echo "SKIP: $key (binary not found: assets/${binary})" >&2
+              return
+            fi
+            if [ ! -f "$sig" ]; then
+              echo "SKIP: $key (sig not found: $sig)" >&2
+              return
+            fi
+            local sig_content
+            sig_content=$(cat "$sig" | tr -d '\n\r')
+            echo "\"${key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary}\"}"
+          }
 
           echo ""
           echo "=== Building platforms JSON ==="
 
           PLATFORMS=""
           for entry in \
-            "$(build_platform_json "$WIN_EXE" "windows-x86_64")" \
-            "$(build_platform_json "$MAC_ARM" "darwin-aarch64")" \
-            "$(build_platform_json "$MAC_X64" "darwin-x86_64")" \
-            "$(build_platform_json "$LINUX_X64" "linux-x86_64")" \
-            "$(build_platform_json "$LINUX_ARM" "linux-aarch64")"; do
-            if [ -n "$entry" ] && [[ "$entry" != WARNING* ]]; then
+            "$(build_entry "$WIN_EXE" "windows-x86_64")" \
+            "$(build_entry "$MAC_ARM" "darwin-aarch64")" \
+            "$(build_entry "$MAC_X64" "darwin-x86_64")" \
+            "$(build_entry "$LINUX_X64" "linux-x86_64")" \
+            "$(build_entry "$LINUX_ARM" "linux-aarch64")"; do
+            if [ -n "$entry" ] && [[ "$entry" != SKIP* ]]; then
               [ -n "$PLATFORMS" ] && PLATFORMS="${PLATFORMS},"
               PLATFORMS="${PLATFORMS}${entry}"
             fi
@@ -209,7 +251,7 @@ jobs:
           cat > latest.json << EOJSON
           {
             "version": "${VERSION}",
-            "notes": "橙记 ${GITHUB_REF_NAME} — 一目了然，橙就高效。修复已知问题，优化用户体验。",
+            "notes": "橙记 ${TAG} — 一目了然，橙就高效。修复已知问题，优化用户体验。",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {${PLATFORMS}}
           }
@@ -227,6 +269,7 @@ jobs:
 
           if [ -z "$PLATFORMS" ]; then
             echo "WARNING: No platforms found!" >&2
+            exit 1
           fi
 
       - name: upload latest.json
