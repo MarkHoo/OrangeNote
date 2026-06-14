@@ -1,0 +1,34 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare text files
+*.html text
+*.css text
+*.js text
+*.ts text
+*.tsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.toml text
+*.rs text
+*.sh text eol=lf
+*.svg text
+
+# Declare binary files that should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.exe binary
+*.msi binary
+*.dmg binary
+*.AppImage binary
+*.sig binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
