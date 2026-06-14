@@ -79,17 +79,23 @@ jobs:
         shell: bash
         run: |
           mkdir -p release
-          # Copy all installer files and signatures to release/
-          find src-tauri/target \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.sig" \) -not -path "*/wix/*" 2>/dev/null | while read f; do
-            cp "$f" release/
-          done
+          # Find bundle directory (handles --target cross-compilation)
+          BUNDLE="src-tauri/target/release/bundle"
+          if [ ! -d "$BUNDLE" ]; then
+            BUNDLE=$(find src-tauri/target -maxdepth 3 -type d -name "bundle" | head -1)
+          fi
+          echo "Bundle dir: $BUNDLE"
+          # Copy all installers and signatures
+          cp "$BUNDLE"/nsis/*.exe release/ 2>/dev/null || true
+          cp "$BUNDLE"/nsis/*.exe.sig release/ 2>/dev/null || true
+          cp "$BUNDLE"/msi/*.msi release/ 2>/dev/null || true
+          cp "$BUNDLE"/msi/*.msi.sig release/ 2>/dev/null || true
+          cp "$BUNDLE"/dmg/*.dmg release/ 2>/dev/null || true
+          cp "$BUNDLE"/dmg/*.dmg.sig release/ 2>/dev/null || true
+          cp "$BUNDLE"/appimage/*.AppImage release/ 2>/dev/null || true
+          cp "$BUNDLE"/appimage/*.AppImage.sig release/ 2>/dev/null || true
           echo "=== Files ready for upload ==="
           ls -la release/
-          SIG_COUNT=$(ls release/*.sig 2>/dev/null | wc -l)
-          echo "Signature files: $SIG_COUNT"
-          if [ "$SIG_COUNT" -eq 0 ]; then
-            echo "WARNING: No .sig files found! TAURI_SIGNING_PRIVATE_KEY may not be set."
-          fi
 
       - name: upload to release
         uses: softprops/action-gh-release@v2
