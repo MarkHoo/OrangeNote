@@ -89,6 +89,7 @@ jobs:
           echo "Signature files: $SIG_COUNT"
           if [ "$SIG_COUNT" -eq 0 ]; then
             echo "WARNING: No .sig files found! TAURI_SIGNING_PRIVATE_KEY may not be set."
+          fi
 
       - name: upload to release
         uses: softprops/action-gh-release@v2
