@@ -75,7 +75,7 @@ jobs:
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
 
-      - name: sign installers
+      - name: sign installers (Tauri updater)
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -96,6 +96,37 @@ jobs:
           done
           echo "=== Signature files ==="
           find "$BUNDLE" -name "*.sig" | sort
+
+      - name: Windows code signing
+        if: matrix.platform == 'windows-latest'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -z "$WINDOWS_CERTIFICATE" ]; then
+            echo "WARNING: WINDOWS_CERTIFICATE not set, skipping code signing"
+            echo "To fix SmartScreen warning, add these GitHub Secrets:"
+            echo "  WINDOWS_CERTIFICATE: base64 encoded .pfx certificate"
+            echo "  WINDOWS_CERTIFICATE_PASSWORD: certificate password"
+            exit 0
+          fi
+          # Decode certificate
+          echo "$WINDOWS_CERTIFICATE" | base64 -d > /tmp/certificate.pfx
+          # Find signtool
+          SIGNTOOL="C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/signtool.exe"
+          if [ ! -f "$SIGNTOOL" ]; then
+            SIGNTOOL=$(find "/c/Program Files (x86)/Windows Kits" -name "signtool.exe" -path "*/x64/*" 2>/dev/null | head -1)
+          fi
+          echo "Using signtool: $SIGNTOOL"
+          # Sign all .exe and .msi files
+          BUNDLE="src-tauri/target/release/bundle"
+          find "$BUNDLE" \( -name "*.exe" -o -name "*.msi" \) | while read f; do
+            echo "Code signing: $(basename "$f")"
+            "$SIGNTOOL" sign /f /tmp/certificate.pfx /p "$WINDOWS_CERTIFICATE_PASSWORD" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "$f" 2>&1 || true
+          done
+          # Clean up
+          rm -f /tmp/certificate.pfx
 
       - name: collect release files
         shell: bash
@@ -131,18 +162,20 @@ jobs:
 
             ### 📦 下载安装
 
-            | 平台 | 架构 | 安装包 |
-            |------|------|--------|
-            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64-setup.exe` (NSIS) |
-            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64.msi` (MSI) |
-            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-${{ github.ref_name }}-macOS-aarch64.dmg` |
-            | macOS | Intel | `OrangeNote-${{ github.ref_name }}-macOS-x64.dmg` |
-            | Linux | x64 | `OrangeNote-${{ github.ref_name }}-Linux-amd64.AppImage` |
-            | Linux | ARM64 | `OrangeNote-${{ github.ref_name }}-Linux-aarch64.AppImage` |
+            | 平台 | 架构 | 安装包 | 说明 |
+            |------|------|--------|------|
+            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64-setup.exe` | ⭐ 推荐，支持自动更新 |
+            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64.msi` | 企业部署 |
+            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-${{ github.ref_name }}-macOS-aarch64.dmg` | |
+            | macOS | Intel | `OrangeNote-${{ github.ref_name }}-macOS-x64.dmg` | |
+            | Linux | x64 | `OrangeNote-${{ github.ref_name }}-Linux-amd64.AppImage` | |
+            | Linux | ARM64 | `OrangeNote-${{ github.ref_name }}-Linux-aarch64.AppImage` | |
 
             ### 🔄 自动更新
 
-            应用内置自动更新功能，启动时会自动检测新版本并静默下载。也可在 **设置 → 检查更新** 手动触发。
+            应用内置自动更新功能，启动时会自动检测新版本并静默下载。也可在 **设置 → 检查更新** 手动触发。推荐使用 NSIS 安装包（`.exe`）以获得最佳更新体验。
+
+            > **注意：** Windows 用户首次运行时可能看到 SmartScreen 警告，请点击"仍要运行"。后续版本将添加代码签名以消除此提示。
 
             ### 🛠 技术栈
 

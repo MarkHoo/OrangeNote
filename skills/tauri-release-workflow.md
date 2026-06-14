@@ -102,6 +102,18 @@ npx @tauri-apps/cli signer generate -w .tauri/key --password ""
 | GitHub Secret `TAURI_SIGNING_PRIVATE_KEY` | 私钥（`.tauri/key` 内容） |
 | GitHub Secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 密码（空则不设置） |
 
+### Windows 代码签名（消除 SmartScreen 警告）
+
+| Secret 名称 | 内容 |
+|-------------|------|
+| `WINDOWS_CERTIFICATE` | Base64 编码的 `.pfx` 证书文件 |
+| `WINDOWS_CERTIFICATE_PASSWORD` | 证书密码 |
+
+获取证书后编码：
+```bash
+base64 -i certificate.pfx -o certificate.txt
+```
+
 ### 注意事项
 
 - 私钥文件 `.tauri/key` 必须加入 `.gitignore`，绝不能提交
