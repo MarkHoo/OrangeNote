@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getName, getVersion } from '@tauri-apps/api/app';
 import { useStore } from '../store/useStore';
 import ColorPicker from './ColorPicker';
 import type { Language } from '../types';
@@ -25,6 +26,11 @@ const Settings: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [foundVersion, setFoundVersion] = useState('');
   const [updateError, setUpdateError] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion(''));
+  }, []);
 
   const handleLanguageChange = (lang: Language) => {
     storeSetLanguage(lang);
@@ -194,7 +200,7 @@ const Settings: React.FC = () => {
               <div className="text-3xl">🍊</div>
               <h3 className="text-lg font-bold text-orange-600">{t('app.name')}</h3>
               <p className="text-sm text-gray-500">{t('app.slogan')}</p>
-              <p className="text-xs text-gray-400">{t('settings.version')} v1.0.0</p>
+              <p className="text-xs text-gray-400">{t('settings.version')} v{appVersion}</p>
             </div>
           </div>
         </div>
