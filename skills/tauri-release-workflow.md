@@ -3,7 +3,8 @@
 ## 核心流程
 
 ```
-代码修改 → 版本同步 → git tag → GitHub Actions 自动构建 → 重命名安装包 → 签名 → 上传 Release → 生成 latest.json
+代码修改 → 版本同步 → TypeScript 编译检查 → git tag → GitHub Actions 自动构建
+→ 签名 → 重命名 → 上传 Release → 生成 latest.json → 用户端自动更新
 ```
 
 ---
@@ -26,11 +27,13 @@
 
 ```bash
 # 1. 修改版本号（三个文件）
-# 2. 提交
+# 2. TypeScript 编译检查
+npx tsc -b
+# 3. 提交
 git add -A && git commit -m "chore: 发布 vX.Y.Z"
-# 3. 推送代码
+# 4. 推送代码
 git push origin main
-# 4. 打 tag 并推送（触发 CI 构建）
+# 5. 打 tag 并推送（触发 CI 构建）
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
@@ -54,14 +57,15 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 
 ```
 checkout → setup rust → rust cache → setup node → install deps → npm ci
-→ tauri build → rename installers → sign installers → collect files → upload
+→ tauri build → rename installers → sign installers (Tauri updater)
+→ Windows code signing → collect release files → upload
 ```
 
 ### 关键配置
 
-- **交叉编译路径**：`--target` 指定时，输出在 `target/<arch>/release/bundle/` 而非 `target/release/bundle/`
+- **交叉编译路径**：`--target` 指定时，输出在 `target/<arch>/release/bundle/`
 - **签名**：构建后用 `npx tauri signer sign` 手动生成 `.sig` 文件
-- **上传**：先收集到 `release/` 目录再统一上传，避免 glob 路径问题
+- **上传**：先收集到 `release/` 目录再统一上传
 
 ---
 
@@ -71,18 +75,12 @@ checkout → setup rust → rust cache → setup node → install deps → npm c
 
 | 系统 | 示例 |
 |------|------|
-| Windows | `OrangeNote-v1.1.5-Windows-x64-setup.exe` |
-| Windows | `OrangeNote-v1.1.5-Windows-x64.msi` |
-| macOS | `OrangeNote-v1.1.5-macOS-aarch64.dmg` |
-| macOS | `OrangeNote-v1.1.5-macOS-x64.dmg` |
-| Linux | `OrangeNote-v1.1.5-Linux-amd64.AppImage` |
-| Linux | `OrangeNote-v1.1.5-Linux-aarch64.AppImage` |
-
-重命名脚本（`scripts/`）处理 Tauri 默认命名：
-- 下划线 → 连字符
-- 添加 `v` 前缀
-- 移除 locale（如 `-en-US`）
-- 添加系统类型标识
+| Windows | `OrangeNote-v1.1.6-Windows-x64-setup.exe` |
+| Windows | `OrangeNote-v1.1.6-Windows-x64.msi` |
+| macOS | `OrangeNote-v1.1.6-macOS-aarch64.dmg` |
+| macOS | `OrangeNote-v1.1.6-macOS-x64.dmg` |
+| Linux | `OrangeNote-v1.1.6-Linux-amd64.AppImage` |
+| Linux | `OrangeNote-v1.1.6-Linux-aarch64.AppImage` |
 
 ---
 
@@ -98,31 +96,32 @@ npx @tauri-apps/cli signer generate -w .tauri/key --password ""
 
 | 位置 | 内容 |
 |------|------|
-| `src-tauri/tauri.conf.json` → `plugins.updater.pubkey` | 公钥（`.tauri/key.pub` 内容） |
-| GitHub Secret `TAURI_SIGNING_PRIVATE_KEY` | 私钥（`.tauri/key` 内容） |
-| GitHub Secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 密码（空则不设置） |
+| `src-tauri/tauri.conf.json` → `plugins.updater.pubkey` | 公钥 |
+| GitHub Secret `TAURI_SIGNING_PRIVATE_KEY` | 私钥 |
+| GitHub Secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 密码（可选） |
 
-### Windows 代码签名（消除 SmartScreen 警告）
+### 注意
 
-| Secret 名称 | 内容 |
-|-------------|------|
-| `WINDOWS_CERTIFICATE` | Base64 编码的 `.pfx` 证书文件 |
-| `WINDOWS_CERTIFICATE_PASSWORD` | 证书密码 |
-
-获取证书后编码：
-```bash
-base64 -i certificate.pfx -o certificate.txt
-```
-
-### 注意事项
-
-- 私钥文件 `.tauri/key` 必须加入 `.gitignore`，绝不能提交
-- 公钥可以公开，放在 `tauri.conf.json` 中
-- 私钥泄露后必须重新生成
+- 私钥文件 `.tauri/key` 必须加入 `.gitignore`
+- 公钥放在 `tauri.conf.json` 中可公开
 
 ---
 
-## 6. 自动更新机制（latest.json）
+## 6. Windows 代码签名（消除 SmartScreen 警告）
+
+| Secret 名称 | 内容 |
+|-------------|------|
+| `WINDOWS_CERTIFICATE` | Base64 编码的 `.pfx` 证书 |
+| `WINDOWS_CERTIFICATE_PASSWORD` | 证书密码 |
+
+```bash
+# 编码证书
+base64 -i certificate.pfx -o certificate.txt
+```
+
+---
+
+## 7. 自动更新机制（latest.json）
 
 ### 更新器端点
 
@@ -134,18 +133,15 @@ https://github.com/{owner}/{repo}/releases/latest/download/latest.json
 
 ```json
 {
-  "version": "1.1.5",
-  "notes": "橙记 v1.1.5 — 更新说明",
+  "version": "1.1.6",
+  "notes": "更新说明",
   "pub_date": "2026-06-14T12:00:00Z",
   "platforms": {
-    "windows-x86_64": {
-      "signature": "base64签名",
-      "url": "https://github.com/.../OrangeNote-v1.1.5-Windows-x64-setup.exe"
-    },
-    "darwin-aarch64": { "signature": "...", "url": "...dmg" },
-    "darwin-x86_64": { "signature": "...", "url": "...dmg" },
-    "linux-x86_64": { "signature": "...", "url": "...AppImage" },
-    "linux-aarch64": { "signature": "...", "url": "...AppImage" }
+    "windows-x86_64": {"signature": "...", "url": "...exe"},
+    "darwin-aarch64": {"signature": "...", "url": "...dmg"},
+    "darwin-x86_64": {"signature": "...", "url": "...dmg"},
+    "linux-x86_64": {"signature": "...", "url": "...AppImage"},
+    "linux-aarch64": {"signature": "...", "url": "...AppImage"}
   }
 }
 ```
@@ -162,15 +158,56 @@ https://github.com/{owner}/{repo}/releases/latest/download/latest.json
 
 ### updater-manifest 生成逻辑
 
-1. 通过 GitHub API 获取 release 资产列表
-2. 用 curl 逐个下载二进制文件和 `.sig` 签名文件
-3. 按文件名模式匹配平台（如 `*Windows*.exe`）
+1. GitHub API 获取 release 资产列表
+2. curl 逐个下载二进制文件和 `.sig` 签名文件
+3. 按文件名模式匹配平台
 4. 读取签名内容，构建 JSON
 5. 上传到 release
 
 ---
 
-## 7. Dependabot 配置
+## 8. 前端版本号动态获取
+
+```tsx
+import { getVersion } from '@tauri-apps/api/app';
+
+const [appVersion, setAppVersion] = useState('');
+useEffect(() => {
+  getVersion().then(setAppVersion).catch(() => {});
+}, []);
+
+// 显示
+<p>{t('settings.version')} v{appVersion}</p>
+```
+
+---
+
+## 9. tauri.conf.json 关键配置
+
+```json
+{
+  "productName": "OrangeNote",
+  "version": "1.1.6",
+  "identifier": "com.orange-note.app",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi", "dmg", "appimage"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "公钥内容",
+      "endpoints": ["https://github.com/{owner}/{repo}/releases/latest/download/latest.json"]
+    }
+  }
+}
+```
+
+**注意：** `bundle.windows` 下的 `nsis` 和 `wix` 配置需要验证 Tauri v2 schema，不正确的值会导致构建失败。
+
+---
+
+## 10. Dependabot 配置
 
 文件：`.github/dependabot.yml`
 
@@ -193,46 +230,31 @@ updates:
 
 ---
 
-## 8. .gitignore 要点
-
-```gitignore
-# 构建产物
-node_modules/
-dist/
-src-tauri/target/
-
-# 签名密钥（绝不能提交）
-.tauri/
-
-# 本地生成的 latest.json
-latest.json
-```
-
----
-
-## 9. 常见问题速查
+## 11. 常见问题速查
 
 | 问题 | 原因 | 解决 |
 |------|------|------|
-| macOS DMG 缺失 | `--target` 输出到 `target/<arch>/release/bundle/` | 重命名脚本自动检测 bundle 目录 |
+| TypeScript 编译失败 | 未使用的导入 | 移除 `import { getName }` |
+| macOS DMG 缺失 | `--target` 输出路径不同 | 脚本自动检测 bundle 目录 |
 | latest.json platforms 为空 | `.sig` 文件未上传 | 构建后手动生成签名 |
-| Release 被删除 | "clean old release assets" 竞态条件 | 移除该步骤 |
-| 安装包版本与 tag 不一致 | 配置文件版本未同步 | 打 tag 前同步三个文件版本号 |
-| 安装包名含 locale | Tauri 默认命名含 `en-US` | 重命名脚本 sed 移除 |
+| Release 被删除 | clean 步骤竞态条件 | 移除 clean 步骤 |
+| 安装包版本与 tag 不一致 | 配置文件版本未同步 | 打 tag 前同步三个文件 |
 | `gh release download` 不可靠 | 多 `--pattern` 兼容问题 | 改用 GitHub API + curl |
-| `find` 命令在 CI 失败 | 路径不存在导致 exit 1 | 先检测目录再 find |
-| updater-manifest 找不到文件 | `gh release download` 行为不一致 | 改用 API 获取资产列表再 curl 下载 |
+| WiX 构建失败 | `bundle.windows` 配置格式错误 | 验证 schema 或移除自定义配置 |
+| SmartScreen 警告 | 安装包未代码签名 | 配置 WINDOWS_CERTIFICATE Secret |
+| MSI 更新提示"卸载" | WiX 升级配置问题 | 使用 NSIS 或配置 WiX majorUpgrade |
 
 ---
 
-## 10. 完整发布检查清单
+## 12. 完整发布检查清单
 
 - [ ] 三个配置文件版本号一致
-- [ ] 版本号与计划的 tag 一致
+- [ ] `npx tsc -b` 编译通过
+- [ ] `python -m json.tool src-tauri/tauri.conf.json` JSON 有效
 - [ ] `TAURI_SIGNING_PRIVATE_KEY` GitHub Secret 已配置
 - [ ] `.tauri/` 在 `.gitignore` 中
 - [ ] 代码已提交并推送到 main
 - [ ] tag 已推送并触发构建
-- [ ] 构建完成后验证：6 个安装包 + 6 个 .sig + latest.json
+- [ ] 构建完成验证：6 个安装包 + 6 个 .sig + latest.json
 - [ ] latest.json 包含 5 个平台且签名非空
 - [ ] Release body 中的安装包名与实际一致
