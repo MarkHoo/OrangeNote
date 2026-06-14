@@ -98,7 +98,7 @@ jobs:
           ls -la release/
 
       - name: upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: '橙记 ${{ github.ref_name }}'
@@ -292,7 +292,7 @@ jobs:
           echo "SUCCESS: Generated latest.json with $(echo "$PLATFORMS" | grep -o '"url"' | wc -l) platforms"
 
       - name: upload latest.json
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           files: latest.json
