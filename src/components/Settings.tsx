@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getName, getVersion } from '@tauri-apps/api/app';
+import { getVersion } from '@tauri-apps/api/app';
 import { useStore } from '../store/useStore';
 import ColorPicker from './ColorPicker';
 import type { Language } from '../types';
