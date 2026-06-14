@@ -38,9 +38,6 @@
     "windows": {
       "nsis": {
         "installMode": "both"
-      },
-      "wix": {
-        "majorUpgradeStrategy": "installSameVersion"
       }
     }
   },
