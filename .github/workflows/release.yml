@@ -72,41 +72,8 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
-      - name: debug bundle output
-        run: |
-          echo "=== Bundle directory contents ==="
-          find src-tauri/target -type d -name "bundle" 2>/dev/null
-          echo ""
-          echo "=== All bundle files ==="
-          find src-tauri/target \( -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
-        shell: bash
-
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
-
-      - name: list renamed files
-        run: |
-          echo "=== Renamed files ==="
-          find src-tauri/target \( -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
-        shell: bash
-
-      - name: clean old release assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Delete old assets with wrong names (starting with _ or latest.json)
-          # Skip if release doesn't exist yet (first run for this tag)
-          if ! gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            echo "Release not found yet, skipping cleanup"
-            exit 0
-          fi
-          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | while read -r name; do
-            if [[ "$name" == _* ]] || [[ "$name" == latest.json ]]; then
-              echo "Deleting old asset: $name"
-              gh release delete-asset "${{ github.ref_name }}" "$name" --repo "${{ github.repository }}" --yes || true
-            fi
-          done
-        shell: bash
 
       - name: upload to release
         uses: softprops/action-gh-release@v2
@@ -122,12 +89,12 @@ jobs:
 
             | 平台 | 架构 | 安装包 |
             |------|------|--------|
-            | Windows | x64 | `OrangeNote-v1.0.0-Windows-x64-setup.exe` (NSIS) |
-            | Windows | x64 | `OrangeNote-v1.0.0-Windows-x64.msi` (MSI) |
-            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-v1.0.0-macOS-aarch64.dmg` |
-            | macOS | Intel | `OrangeNote-v1.0.0-macOS-x64.dmg` |
-            | Linux | x64 | `OrangeNote-v1.0.0-Linux-amd64.AppImage` |
-            | Linux | ARM64 | `OrangeNote-v1.0.0-Linux-aarch64.AppImage` |
+            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64-setup.exe` (NSIS) |
+            | Windows | x64 | `OrangeNote-${{ github.ref_name }}-Windows-x64.msi` (MSI) |
+            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-${{ github.ref_name }}-macOS-aarch64.dmg` |
+            | macOS | Intel | `OrangeNote-${{ github.ref_name }}-macOS-x64.dmg` |
+            | Linux | x64 | `OrangeNote-${{ github.ref_name }}-Linux-amd64.AppImage` |
+            | Linux | ARM64 | `OrangeNote-${{ github.ref_name }}-Linux-aarch64.AppImage` |
 
             ### 🔄 自动更新
 
@@ -163,11 +130,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p assets && cd assets
-          # Download ALL release assets, then remove non-binary files
           gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --clobber
           rm -f latest.json
-          # Remove any non-binary files that might have been downloaded
-          find . -maxdepth 1 -type f ! -name "*.exe" ! -name "*.msi" ! -name "*.dmg" ! -name "*.AppImage" ! -name "*.sig" -delete
           echo "=== Downloaded files ==="
           ls -la
 
@@ -186,7 +150,7 @@ jobs:
               sig_content=$(cat "$sig_file" | tr -d '\n\r')
               echo "\"${platform_key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary_name}\"}"
             else
-              echo "WARNING: Missing file for ${platform_key}: binary=${binary_name} sig=${sig_file}" >&2
+              echo "WARNING: Missing file for ${platform_key}" >&2
               [ ! -f "assets/${binary_name}" ] && echo "  -> binary not found: assets/${binary_name}" >&2
               [ ! -f "$sig_file" ] && echo "  -> signature not found: ${sig_file}" >&2
             fi
@@ -194,34 +158,30 @@ jobs:
 
           echo "=== Searching for platform files ==="
 
-          # Windows NSIS (.exe with Windows in name)
+          # Windows NSIS (.exe)
           WIN_EXE=$(ls assets/OrangeNote-v*Windows*.exe 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/_[0-9]*.exe 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/*.exe 2>/dev/null | head -1 | xargs -r basename)
           echo "WIN_EXE=$WIN_EXE"
 
-          # macOS ARM64 (.dmg with macOS and aarch64)
+          # macOS ARM64 (.dmg with aarch64)
           MAC_ARM=$(ls assets/OrangeNote-v*macOS*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/OrangeNote-v*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
           echo "MAC_ARM=$MAC_ARM"
 
-          # macOS x64 (.dmg with macOS and x64, not aarch64)
+          # macOS x64 (.dmg with x64, not aarch64)
           MAC_X64=$(ls assets/OrangeNote-v*macOS*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
-          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           echo "MAC_X64=$MAC_X64"
 
-          # Linux x86_64 (.AppImage with Linux and amd64)
+          # Linux x86_64 (.AppImage with amd64)
           LINUX_X64=$(ls assets/OrangeNote-v*Linux*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/OrangeNote-v*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           echo "LINUX_X64=$LINUX_X64"
 
-          # Linux ARM64 (.AppImage with Linux and aarch64)
+          # Linux ARM64 (.AppImage with aarch64)
           LINUX_ARM=$(ls assets/OrangeNote-v*Linux*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/OrangeNote-v*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           echo "LINUX_ARM=$LINUX_ARM"
 
@@ -260,9 +220,8 @@ jobs:
             exit 1
           fi
 
-          # Warn if platforms is empty
           if [ -z "$PLATFORMS" ]; then
-            echo "WARNING: No platforms found! latest.json will have empty platforms." >&2
+            echo "WARNING: No platforms found!" >&2
           fi
 
       - name: upload latest.json
