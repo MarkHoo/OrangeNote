@@ -40,9 +40,7 @@
         "installMode": "both"
       },
       "wix": {
-        "majorUpgradeStrategy": {
-          "installScope": "perMachine"
-        }
+        "majorUpgradeStrategy": "installSameVersion"
       }
     }
   },
