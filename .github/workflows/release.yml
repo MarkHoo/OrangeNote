@@ -75,19 +75,20 @@ jobs:
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
 
-      - name: find all bundle files
+      - name: collect release files
         shell: bash
         run: |
-          echo "=== All bundle files ==="
-          find src-tauri/target \( -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
-          echo ""
-          echo "=== All .sig files ==="
-          SIG_COUNT=$(find src-tauri/target -name "*.sig" 2>/dev/null | wc -l)
-          find src-tauri/target -name "*.sig" 2>/dev/null | sort
-          echo "Total .sig files: $SIG_COUNT"
+          mkdir -p release
+          # Copy all installer files and signatures to release/
+          find src-tauri/target \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.sig" \) -not -path "*/wix/*" 2>/dev/null | while read f; do
+            cp "$f" release/
+          done
+          echo "=== Files ready for upload ==="
+          ls -la release/
+          SIG_COUNT=$(ls release/*.sig 2>/dev/null | wc -l)
+          echo "Signature files: $SIG_COUNT"
           if [ "$SIG_COUNT" -eq 0 ]; then
             echo "WARNING: No .sig files found! TAURI_SIGNING_PRIVATE_KEY may not be set."
-          fi
 
       - name: upload to release
         uses: softprops/action-gh-release@v2
@@ -120,16 +121,11 @@ jobs:
             - **后端：** Rust + Tauri 2 + SQLite
             - **支持平台：** Windows 10+、macOS 12+、Ubuntu 22.04+
           files: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.sig
-            src-tauri/target/*/release/bundle/**/*.exe
-            src-tauri/target/*/release/bundle/**/*.msi
-            src-tauri/target/*/release/bundle/**/*.dmg
-            src-tauri/target/*/release/bundle/**/*.AppImage
-            src-tauri/target/*/release/bundle/**/*.sig
+            release/*.exe
+            release/*.msi
+            release/*.dmg
+            release/*.AppImage
+            release/*.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
