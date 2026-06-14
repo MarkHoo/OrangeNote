@@ -34,3 +34,4 @@ Thumbs.db
 # Tauri signing keys (keep private)
 *.key
 latest.json
+.tauri/
