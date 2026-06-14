@@ -163,12 +163,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p assets && cd assets
-          # Download all binary and signature assets
-          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" \
-            --pattern "*.exe" --pattern "*.msi" --pattern "*.dmg" \
-            --pattern "*.AppImage" --pattern "*.sig"
-          # Remove latest.json if accidentally downloaded
+          # Download ALL release assets, then remove non-binary files
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --clobber
           rm -f latest.json
+          # Remove any non-binary files that might have been downloaded
+          find . -maxdepth 1 -type f ! -name "*.exe" ! -name "*.msi" ! -name "*.dmg" ! -name "*.AppImage" ! -name "*.sig" -delete
           echo "=== Downloaded files ==="
           ls -la
 
