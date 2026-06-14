@@ -72,8 +72,23 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
+      - name: debug bundle output
+        run: |
+          echo "=== Bundle directory contents ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null | sort
+          echo ""
+          echo "=== DMG/AppImage/EXE/MSI files ==="
+          find src-tauri/target/release/bundle \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" -o -name "*.sig" \) 2>/dev/null | sort
+        shell: bash
+
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
+
+      - name: list renamed files
+        run: |
+          echo "=== Renamed files ==="
+          find src-tauri/target/release/bundle \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" -o -name "*.sig" \) 2>/dev/null | sort
+        shell: bash
 
       - name: clean old release assets
         env:
@@ -107,12 +122,12 @@ jobs:
 
             | 平台 | 架构 | 安装包 |
             |------|------|--------|
-            | Windows | x64 | `OrangeNote-v1.0.0-x64-setup.exe` (NSIS) |
-            | Windows | x64 | `OrangeNote-v1.0.0-x64.msi` (MSI) |
-            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-v1.0.0-aarch64.dmg` |
-            | macOS | Intel | `OrangeNote-v1.0.0-x64.dmg` |
-            | Linux | x64 | `OrangeNote-v1.0.0-amd64.AppImage` |
-            | Linux | ARM64 | `OrangeNote-v1.0.0-aarch64.AppImage` |
+            | Windows | x64 | `OrangeNote-v1.0.0-Windows-x64-setup.exe` (NSIS) |
+            | Windows | x64 | `OrangeNote-v1.0.0-Windows-x64.msi` (MSI) |
+            | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-v1.0.0-macOS-aarch64.dmg` |
+            | macOS | Intel | `OrangeNote-v1.0.0-macOS-x64.dmg` |
+            | Linux | x64 | `OrangeNote-v1.0.0-Linux-amd64.AppImage` |
+            | Linux | ARM64 | `OrangeNote-v1.0.0-Linux-aarch64.AppImage` |
 
             ### 🔄 自动更新
 
@@ -175,29 +190,34 @@ jobs:
 
           echo "=== Searching for platform files ==="
 
-          # Windows NSIS (.exe)
-          WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
+          # Windows NSIS (.exe with Windows in name)
+          WIN_EXE=$(ls assets/OrangeNote-v*Windows*.exe 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/_[0-9]*.exe 2>/dev/null | head -1 | xargs -r basename)
           echo "WIN_EXE=$WIN_EXE"
 
-          # macOS ARM64 (.dmg with aarch64)
-          MAC_ARM=$(ls assets/OrangeNote-v*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          # macOS ARM64 (.dmg with macOS and aarch64)
+          MAC_ARM=$(ls assets/OrangeNote-v*macOS*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/OrangeNote-v*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
           echo "MAC_ARM=$MAC_ARM"
 
-          # macOS x64 (.dmg with x64, not aarch64)
-          MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          # macOS x64 (.dmg with macOS and x64, not aarch64)
+          MAC_X64=$(ls assets/OrangeNote-v*macOS*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           echo "MAC_X64=$MAC_X64"
 
-          # Linux x86_64 (.AppImage without aarch64)
-          LINUX_X64=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          # Linux x86_64 (.AppImage with Linux and amd64)
+          LINUX_X64=$(ls assets/OrangeNote-v*Linux*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/OrangeNote-v*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/_[0-9]*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
           echo "LINUX_X64=$LINUX_X64"
 
-          # Linux ARM64 (.AppImage with aarch64)
-          LINUX_ARM=$(ls assets/OrangeNote-v*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          # Linux ARM64 (.AppImage with Linux and aarch64)
+          LINUX_ARM=$(ls assets/OrangeNote-v*Linux*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/OrangeNote-v*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
           echo "LINUX_ARM=$LINUX_ARM"
 

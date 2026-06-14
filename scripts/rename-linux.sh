@@ -1,5 +1,8 @@
 #!/bin/bash
 # Rename Linux AppImage and signature
+# - Replaces underscores with hyphens
+# - Adds 'v' prefix to version number
+# - Adds 'Linux' system type to filename
 BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "=== Linux Rename Script ==="
@@ -11,7 +14,10 @@ find "$BUNDLE_DIR" \( -name "*.AppImage" -o -name "*.AppImage.sig" \) 2>/dev/nul
   [ -f "$file" ] || continue
   dir=$(dirname "$file")
   base=$(basename "$file")
-  newbase=$(echo "$base" | sed 's/_\([0-9]\)/-v\1/g' | sed 's/_/-/g')
+  newbase=$(echo "$base" \
+    | sed 's/_\([0-9]\)/-v\1/g' \
+    | sed 's/_/-/g' \
+    | sed 's/\(-v[0-9][^-]*\)/\1-Linux/')
   if [ "$base" != "$newbase" ]; then
     mv "$file" "$dir/$newbase"
     echo "Renamed: $base -> $newbase"

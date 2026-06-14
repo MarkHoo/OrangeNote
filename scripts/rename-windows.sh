@@ -3,6 +3,7 @@
 # - Replaces underscores with hyphens
 # - Adds 'v' prefix to version number
 # - Removes locale identifiers (en-US, zh-CN, zh-TW, etc.)
+# - Adds 'Windows' system type to filename
 BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "=== Windows Rename Script ==="
@@ -19,7 +20,8 @@ find "$BUNDLE_DIR" \( -name "*.exe" -o -name "*.exe.sig" -o -name "*.msi" -o -na
     | sed 's/_/-/g' \
     | sed 's/-en-US//g' \
     | sed 's/-zh-CN//g' \
-    | sed 's/-zh-TW//g')
+    | sed 's/-zh-TW//g' \
+    | sed 's/\(-v[0-9][^-]*\)/\1-Windows/')
   if [ "$base" != "$newbase" ]; then
     mv "$file" "$dir/$newbase"
     echo "Renamed: $base -> $newbase"
