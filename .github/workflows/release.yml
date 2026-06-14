@@ -75,6 +75,28 @@ jobs:
       - name: rename installers
         run: bash scripts/${{ matrix.rename_script }}
 
+      - name: sign installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "WARNING: TAURI_SIGNING_PRIVATE_KEY not set, skipping signing"
+            exit 0
+          fi
+          BUNDLE="src-tauri/target/release/bundle"
+          if [ ! -d "$BUNDLE" ]; then
+            BUNDLE=$(find src-tauri/target -maxdepth 3 -type d -name "bundle" | head -1)
+          fi
+          echo "Signing files in $BUNDLE..."
+          find "$BUNDLE" \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" \) | while read f; do
+            echo "Signing: $(basename "$f")"
+            npx tauri signer sign "$f" --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" 2>&1 || true
+          done
+          echo "=== Signature files ==="
+          find "$BUNDLE" -name "*.sig" | sort
+
       - name: collect release files
         shell: bash
         run: |
