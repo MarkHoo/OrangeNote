@@ -1,3 +1,12 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 # Node
 node_modules/
 dist/
@@ -5,8 +14,8 @@ dist-ssr/
 *.local
 
 # Rust / Tauri build artifacts
-app-frontend/src-tauri/target/
-app-frontend/src-tauri/WixTools*/
+src-tauri/target/
+src-tauri/WixTools*/
 
 # OS
 .DS_Store
@@ -21,14 +30,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # Tauri signing keys (keep private)
 *.key

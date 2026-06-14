@@ -1,19 +1,73 @@
-技术架构：React 18 + TypeScript + Tauri 2 + Rust + SQLite + JSON
+# React + TypeScript + Vite
 
-软件名字叫：橙记。
-Slogan（口号）：一目了然，橙就高效。
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-- 支持设置默认便签颜色。内置 32 种配色方便用户选择。
+Currently, two official plugins are available:
 
-- 增加对标签进行增删改查。
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-- 增加对标签进行单个或者批量处理，比如删除或者固定到桌面显示
+## React Compiler
 
-- 增加数据本地持久化存储，比如使用sqlite。
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- 增加 软件检查更新功能，方便用户更新升级软件，默认开启自动更新但可以关闭。
+## Expanding the ESLint configuration
 
-- 增加切换软件语言为简体中文，繁体中文，英语。首次安装软件如果系统语言是简体中文就把软件设置简体中文，如果系统不是简体中文就设置为英语。只在首次安装软件生效，后续更新根据用户设置的显示就行了。
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-- 便签可以设置单个提醒时间或者多个提醒时间。提醒方式为便签颜色变为多彩颜色闪烁或者便签边框变为多彩颜色闪烁，以及其他多种有创意的有趣互动方式，并且提醒方式可以选择。增加可以设置提醒声音，并且内置多种声音可供选择。
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```

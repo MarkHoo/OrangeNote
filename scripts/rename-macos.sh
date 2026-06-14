@@ -1,6 +1,6 @@
 #!/bin/bash
 # Rename macOS DMG and signature
-BUNDLE_DIR="app-frontend/src-tauri/target/release/bundle"
+BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "=== macOS Rename Script ==="
 echo "Bundle dir: $BUNDLE_DIR"

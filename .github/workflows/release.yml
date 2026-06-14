@@ -27,6 +27,9 @@ jobs:
           - platform: ubuntu-22.04
             args: ''
             rename_script: rename-linux.sh
+          - platform: ubuntu-24.04-arm
+            args: ''
+            rename_script: rename-linux.sh
 
     runs-on: ${{ matrix.platform }}
 
@@ -42,24 +45,23 @@ jobs:
       - name: rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: './app-frontend/src-tauri -> target'
+          workspaces: './src-tauri -> target'
 
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: npm
-          cache-dependency-path: app-frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: install linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend dependencies
         run: npm ci
-        working-directory: app-frontend
 
       - name: build
         uses: tauri-apps/tauri-action@v0
@@ -68,11 +70,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: app-frontend
           args: ${{ matrix.args }}
 
       - name: rename installers
-        run: bash app-frontend/scripts/${{ matrix.rename_script }}
+        run: bash scripts/${{ matrix.rename_script }}
 
       - name: clean old release assets
         env:
@@ -106,6 +107,7 @@ jobs:
             | macOS | Apple Silicon (M1/M2/M3) | `OrangeNote-v1.0.0-aarch64.dmg` |
             | macOS | Intel | `OrangeNote-v1.0.0-x64.dmg` |
             | Linux | x64 | `OrangeNote-v1.0.0-amd64.AppImage` |
+            | Linux | ARM64 | `OrangeNote-v1.0.0-aarch64.AppImage` |
 
             ### 🔄 自动更新
 
@@ -117,11 +119,11 @@ jobs:
             - **后端：** Rust + Tauri 2 + SQLite
             - **支持平台：** Windows 10+、macOS 12+、Ubuntu 22.04+
           files: |
-            app-frontend/src-tauri/target/release/bundle/**/*.exe
-            app-frontend/src-tauri/target/release/bundle/**/*.msi
-            app-frontend/src-tauri/target/release/bundle/**/*.dmg
-            app-frontend/src-tauri/target/release/bundle/**/*.AppImage
-            app-frontend/src-tauri/target/release/bundle/**/*.sig
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -135,12 +137,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p assets
-          cd assets
-          # Download release assets (exclude latest.json)
+          mkdir -p assets && cd assets
+          # Download all binary and signature assets
           gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" \
             --pattern "*.exe" --pattern "*.msi" --pattern "*.dmg" \
-            --pattern "*.AppImage" --pattern "*.sig" || true
+            --pattern "*.AppImage" --pattern "*.sig"
           # Remove latest.json if accidentally downloaded
           rm -f latest.json
           echo "=== Downloaded files ==="
@@ -160,39 +161,52 @@ jobs:
               local sig_content
               sig_content=$(cat "$sig_file" | tr -d '\n\r')
               echo "\"${platform_key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary_name}\"}"
+            else
+              echo "WARNING: Missing file for ${platform_key}: binary=${binary_name} sig=${sig_file}" >&2
+              [ ! -f "assets/${binary_name}" ] && echo "  -> binary not found: assets/${binary_name}" >&2
+              [ ! -f "$sig_file" ] && echo "  -> signature not found: ${sig_file}" >&2
             fi
           }
 
-          # Find actual filenames - prefer new naming (OrangeNote-v*), fallback to old (_*)
-          # Windows NSIS
+          echo "=== Searching for platform files ==="
+
+          # Windows NSIS (.exe)
           WIN_EXE=$(ls assets/OrangeNote-v*.exe 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$WIN_EXE" ] && WIN_EXE=$(ls assets/_[0-9]*.exe 2>/dev/null | head -1 | xargs -r basename)
+          echo "WIN_EXE=$WIN_EXE"
 
-          # macOS ARM64
+          # macOS ARM64 (.dmg with aarch64)
           MAC_ARM=$(ls assets/OrangeNote-v*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
           [ -z "$MAC_ARM" ] && MAC_ARM=$(ls assets/*aarch64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          echo "MAC_ARM=$MAC_ARM"
 
-          # macOS x64
-          MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/_[0-9]*x64*.dmg 2>/dev/null | head -1 | xargs -r basename)
+          # macOS x64 (.dmg with x64, not aarch64)
+          MAC_X64=$(ls assets/OrangeNote-v*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          [ -z "$MAC_X64" ] && MAC_X64=$(ls assets/*x64*.dmg 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          echo "MAC_X64=$MAC_X64"
 
-          # Linux AppImage
-          LINUX_APP=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | head -1 | xargs -r basename)
-          [ -z "$LINUX_APP" ] && LINUX_APP=$(ls assets/_[0-9]*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          # Linux x86_64 (.AppImage without aarch64)
+          LINUX_X64=$(ls assets/OrangeNote-v*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/*amd64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$LINUX_X64" ] && LINUX_X64=$(ls assets/_[0-9]*.AppImage 2>/dev/null | grep -v aarch64 | head -1 | xargs -r basename)
+          echo "LINUX_X64=$LINUX_X64"
 
-          echo "Found files:"
-          echo "  WIN_EXE=$WIN_EXE"
-          echo "  MAC_ARM=$MAC_ARM"
-          echo "  MAC_X64=$MAC_X64"
-          echo "  LINUX_APP=$LINUX_APP"
+          # Linux ARM64 (.AppImage with aarch64)
+          LINUX_ARM=$(ls assets/OrangeNote-v*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          [ -z "$LINUX_ARM" ] && LINUX_ARM=$(ls assets/*aarch64*.AppImage 2>/dev/null | head -1 | xargs -r basename)
+          echo "LINUX_ARM=$LINUX_ARM"
+
+          echo ""
+          echo "=== Building platforms JSON ==="
 
           PLATFORMS=""
           for entry in \
             "$(build_platform_json "$WIN_EXE" "windows-x86_64")" \
             "$(build_platform_json "$MAC_ARM" "darwin-aarch64")" \
             "$(build_platform_json "$MAC_X64" "darwin-x86_64")" \
-            "$(build_platform_json "$LINUX_APP" "linux-x86_64")"; do
-            if [ -n "$entry" ]; then
+            "$(build_platform_json "$LINUX_X64" "linux-x86_64")" \
+            "$(build_platform_json "$LINUX_ARM" "linux-aarch64")"; do
+            if [ -n "$entry" ] && [[ "$entry" != WARNING* ]]; then
               [ -n "$PLATFORMS" ] && PLATFORMS="${PLATFORMS},"
               PLATFORMS="${PLATFORMS}${entry}"
             fi
@@ -207,8 +221,20 @@ jobs:
           }
           EOJSON
 
+          echo ""
           echo "=== latest.json ==="
           cat latest.json
+
+          # Validate JSON
+          if ! python3 -m json.tool latest.json > /dev/null 2>&1; then
+            echo "ERROR: Generated JSON is invalid!" >&2
+            exit 1
+          fi
+
+          # Warn if platforms is empty
+          if [ -z "$PLATFORMS" ]; then
+            echo "WARNING: No platforms found! latest.json will have empty platforms." >&2
+          fi
 
       - name: upload latest.json
         uses: softprops/action-gh-release@v2

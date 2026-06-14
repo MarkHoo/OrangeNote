@@ -1,6 +1,6 @@
 #!/bin/bash
 # Rename Linux AppImage and signature
-BUNDLE_DIR="app-frontend/src-tauri/target/release/bundle"
+BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "=== Linux Rename Script ==="
 echo "Bundle dir: $BUNDLE_DIR"

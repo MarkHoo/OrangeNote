@@ -1,6 +1,9 @@
 #!/bin/bash
 # Rename Windows NSIS/MSI installers and signatures
-BUNDLE_DIR="app-frontend/src-tauri/target/release/bundle"
+# - Replaces underscores with hyphens
+# - Adds 'v' prefix to version number
+# - Removes locale identifiers (en-US, zh-CN, zh-TW, etc.)
+BUNDLE_DIR="src-tauri/target/release/bundle"
 
 echo "=== Windows Rename Script ==="
 echo "Bundle dir: $BUNDLE_DIR"
@@ -11,7 +14,12 @@ find "$BUNDLE_DIR" \( -name "*.exe" -o -name "*.exe.sig" -o -name "*.msi" -o -na
   [ -f "$file" ] || continue
   dir=$(dirname "$file")
   base=$(basename "$file")
-  newbase=$(echo "$base" | sed 's/_\([0-9]\)/-v\1/g' | sed 's/_/-/g')
+  newbase=$(echo "$base" \
+    | sed 's/_\([0-9]\)/-v\1/g' \
+    | sed 's/_/-/g' \
+    | sed 's/-en-US//g' \
+    | sed 's/-zh-CN//g' \
+    | sed 's/-zh-TW//g')
   if [ "$base" != "$newbase" ]; then
     mv "$file" "$dir/$newbase"
     echo "Renamed: $base -> $newbase"
