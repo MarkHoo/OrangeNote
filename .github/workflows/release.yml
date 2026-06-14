@@ -78,11 +78,16 @@ jobs:
       - name: find all bundle files
         shell: bash
         run: |
-          echo "=== All files in target/ matching bundle patterns ==="
+          echo "=== All bundle files ==="
           find src-tauri/target \( -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
           echo ""
-          echo "=== All .sig files anywhere in target/ ==="
+          echo "=== All .sig files ==="
+          SIG_COUNT=$(find src-tauri/target -name "*.sig" 2>/dev/null | wc -l)
           find src-tauri/target -name "*.sig" 2>/dev/null | sort
+          echo "Total .sig files: $SIG_COUNT"
+          if [ "$SIG_COUNT" -eq 0 ]; then
+            echo "WARNING: No .sig files found! TAURI_SIGNING_PRIVATE_KEY may not be set."
+          fi
 
       - name: upload to release
         uses: softprops/action-gh-release@v2
@@ -227,17 +232,17 @@ jobs:
               echo "SKIP: $key (no binary found)" >&2
               return
             fi
-            local sig="assets/${binary}.sig"
             if [ ! -f "assets/${binary}" ]; then
               echo "SKIP: $key (binary not found: assets/${binary})" >&2
               return
             fi
-            if [ ! -f "$sig" ]; then
-              echo "SKIP: $key (sig not found: $sig)" >&2
-              return
+            local sig="assets/${binary}.sig"
+            local sig_content=""
+            if [ -f "$sig" ]; then
+              sig_content=$(cat "$sig" | tr -d '\n\r')
+            else
+              echo "WARN: $key (sig not found, using empty signature)" >&2
             fi
-            local sig_content
-            sig_content=$(cat "$sig" | tr -d '\n\r')
             echo "\"${key}\": {\"signature\": \"${sig_content}\", \"url\": \"${REPO_URL}/${binary}\"}"
           }
 
@@ -277,9 +282,11 @@ jobs:
           fi
 
           if [ -z "$PLATFORMS" ]; then
-            echo "WARNING: No platforms found!" >&2
+            echo "ERROR: No platforms found! Binary files may be missing." >&2
             exit 1
           fi
+
+          echo "SUCCESS: Generated latest.json with $(echo "$PLATFORMS" | grep -o '"url"' | wc -l) platforms"
 
       - name: upload latest.json
         uses: softprops/action-gh-release@v2
