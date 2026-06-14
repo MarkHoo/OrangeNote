@@ -3,13 +3,18 @@
 # - Replaces underscores with hyphens
 # - Adds 'v' prefix to version number
 # - Adds 'macOS' system type to filename
+
+# Find the bundle directory (handles --target cross-compilation)
 BUNDLE_DIR="src-tauri/target/release/bundle"
+if [ ! -d "$BUNDLE_DIR" ]; then
+  BUNDLE_DIR=$(find src-tauri/target -maxdepth 3 -type d -name "bundle" 2>/dev/null | head -1)
+fi
 
 echo "=== macOS Rename Script ==="
 echo "Bundle dir: $BUNDLE_DIR"
 ls -la "$BUNDLE_DIR" 2>/dev/null || echo "Bundle dir not found!"
 echo "Searching for DMG files..."
-find "$BUNDLE_DIR" -name "*.dmg" -o -name "*.dmg.sig" 2>/dev/null
+find "$BUNDLE_DIR" \( -name "*.dmg" -o -name "*.dmg.sig" \) 2>/dev/null
 
 find_count=0
 find "$BUNDLE_DIR" \( -name "*.dmg" -o -name "*.dmg.sig" \) 2>/dev/null | while read -r file; do

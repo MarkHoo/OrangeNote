@@ -3,7 +3,12 @@
 # - Replaces underscores with hyphens
 # - Adds 'v' prefix to version number
 # - Adds 'Linux' system type to filename
+
+# Find the bundle directory (handles --target cross-compilation)
 BUNDLE_DIR="src-tauri/target/release/bundle"
+if [ ! -d "$BUNDLE_DIR" ]; then
+  BUNDLE_DIR=$(find src-tauri/target -maxdepth 3 -type d -name "bundle" 2>/dev/null | head -1)
+fi
 
 echo "=== Linux Rename Script ==="
 echo "Bundle dir: $BUNDLE_DIR"

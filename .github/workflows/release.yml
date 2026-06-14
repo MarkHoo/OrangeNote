@@ -75,10 +75,10 @@ jobs:
       - name: debug bundle output
         run: |
           echo "=== Bundle directory contents ==="
-          find src-tauri/target/release/bundle -type f 2>/dev/null | sort
+          find src-tauri/target -type d -name "bundle" 2>/dev/null
           echo ""
-          echo "=== DMG/AppImage/EXE/MSI files ==="
-          find src-tauri/target/release/bundle \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" -o -name "*.sig" \) 2>/dev/null | sort
+          echo "=== All bundle files ==="
+          find src-tauri/target \( -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
         shell: bash
 
       - name: rename installers
@@ -87,7 +87,7 @@ jobs:
       - name: list renamed files
         run: |
           echo "=== Renamed files ==="
-          find src-tauri/target/release/bundle \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" -o -name "*.sig" \) 2>/dev/null | sort
+          find src-tauri/target \( -path "*/bundle/*.dmg" -o -path "*/bundle/*.AppImage" -o -path "*/bundle/*.exe" -o -path "*/bundle/*.msi" -o -path "*/bundle/*.sig" \) 2>/dev/null | sort
         shell: bash
 
       - name: clean old release assets
@@ -144,6 +144,11 @@ jobs:
             src-tauri/target/release/bundle/**/*.dmg
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.sig
+            src-tauri/target/*/release/bundle/**/*.exe
+            src-tauri/target/*/release/bundle/**/*.msi
+            src-tauri/target/*/release/bundle/**/*.dmg
+            src-tauri/target/*/release/bundle/**/*.AppImage
+            src-tauri/target/*/release/bundle/**/*.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
