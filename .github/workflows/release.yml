@@ -34,7 +34,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: setup rust
         uses: dtolnay/rust-toolchain@stable
@@ -195,7 +195,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: generate and upload latest.json
         env:
